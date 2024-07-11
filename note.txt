@@ -1,0 +1,200 @@
+Mô hình MVC (Model-View-Controller) là một cách tổ chức mã nguồn giúp tách biệt các thành phần của ứng dụng để dễ quản lý và phát triển.
+Dưới đây là cách tổ chức mã nguồn backend theo mô hình MVC và một ví dụ chi tiết để bạn hình dung rõ hơn.
+  backend/
+  ├── controllers/
+  │   ├── userController.js
+  ├── models/
+  │   ├── userModel.js
+  ├── routes/
+  │   ├── userRoutes.js
+  ├── views/
+  │   ├── emailTemplate.handlebars
+  ├── config/
+  │   ├── db.js
+  ├── .env
+  ├── server.js
+  ├── package.json
+  └── README.md
+
+Mô hình MVC (Model-View-Controller) là một cách tổ chức mã nguồn giúp tách biệt các thành phần của ứng dụng để dễ quản lý và phát triển. Dưới đây là cách tổ chức mã nguồn backend theo mô hình MVC và một ví dụ chi tiết để bạn hình dung rõ hơn.
+
+1. Cấu trúc thư mục
+lua
+Sao chép mã
+backend/
+├── controllers/
+│   ├── userController.js
+├── models/
+│   ├── userModel.js
+├── routes/
+│   ├── userRoutes.js
+├── views/
+│   ├── emailTemplate.handlebars
+├── config/
+│   ├── db.js
+├── .env
+├── server.js
+├── package.json
+└── README.md
+2.Chi tiết:
+  a. server.js  
+    Đây là điểm khởi đầu của ứng dụng, nơi bạn cấu hình server và các middleware cần thiết.
+      require('dotenv').config();
+      const express = require('express');
+      const mongoose = require('mongoose');
+      const bodyParser = require('body-parser');
+      const cors = require('cors');
+      const cookieParser = require('cookie-parser');
+
+      const app = express();
+
+      // Middleware
+      app.use(bodyParser.json());
+      app.use(cors());
+      app.use(cookieParser());
+
+      // Import routes
+      const userRoutes = require('./routes/userRoutes');
+
+      // Use routes
+      app.use('/api/users', userRoutes);
+
+      // Connect to MongoDB
+      mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+          .then(() => console.log('MongoDB connected'))
+          .catch(err => console.log(err));
+
+      // Start server
+      const PORT = process.env.PORT || 5000;
+      app.listen(PORT, () => {
+          console.log(`Server running on port ${PORT}`);
+      });
+
+  b. models/userModel.js
+    Định nghĩa schema và model cho MongoDB.
+      const mongoose = require('mongoose');
+
+      const userSchema = new mongoose.Schema({
+          name: {
+              type: String,
+              required: true
+          },
+          email: {
+              type: String,
+              required: true,
+              unique: true
+          },
+          password: {
+              type: String,
+              required: true
+          },
+          isVerified: {
+              type: Boolean,
+              default: false
+          }
+      }, {
+          timestamps: true
+      });
+
+      const User = mongoose.model('User', userSchema);
+
+      module.exports = User;
+
+  c. controllers/userController.js
+    Xử lý logic của ứng dụng.
+      const User = require('../models/userModel');
+      const bcrypt = require('bcryptjs');
+      const jwt = require('jsonwebtoken');
+
+      exports.registerUser = async (req, res) => {
+          const { name, email, password } = req.body;
+
+          try {
+              const userExists = await User.findOne({ email });
+
+              if (userExists) {
+                  return res.status(400).json({ message: 'User already exists' });
+              }
+
+              const hashedPassword = await bcrypt.hash(password, 10);
+
+              const user = new User({
+                  name,
+                  email,
+                  password: hashedPassword
+              });
+
+              await user.save();
+
+              res.status(201).json({ message: 'User registered successfully' });
+          } catch (error) {
+              res.status(500).json({ message: 'Server error' });
+          }
+      };
+
+      exports.loginUser = async (req, res) => {
+          const { email, password } = req.body;
+
+          try {
+              const user = await User.findOne({ email });
+
+              if (!user) {
+                  return res.status(400).json({ message: 'Invalid credentials' });
+              }
+
+              const isMatch = await bcrypt.compare(password, user.password);
+
+              if (!isMatch) {
+                  return res.status(400).json({ message: 'Invalid credentials' });
+              }
+
+              const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+              res.json({ token });
+          } catch (error) {
+              res.status(500).json({ message: 'Server error' });
+          }
+      };
+
+  d. routes/userRoutes.js
+    Định nghĩa các tuyến đường (routes) cho người dùng.
+      const express = require('express');
+      const router = express.Router();
+      const { registerUser, loginUser } = require('../controllers/userController');
+
+      // Register route
+      router.post('/register', registerUser);
+
+      // Login route
+      router.post('/login', loginUser);
+
+      module.exports = router;
+
+  e. config/db.js
+    Tệp cấu hình kết nối cơ sở dữ liệu (nếu cần thiết).
+      const mongoose = require('mongoose');
+
+      const connectDB = async () => {
+          try {
+              await mongoose.connect(process.env.MONGO_URI, {
+                  useNewUrlParser: true,
+                  useUnifiedTopology: true,
+                  useCreateIndex: true
+              });
+              console.log('MongoDB connected');
+          } catch (error) {
+              console.error('Error connecting to MongoDB', error);
+              process.exit(1);
+          }
+      };
+
+      module.exports = connectDB;
+
+3. Diễn giải chi tiết
+    server.js: Khởi động server và cấu hình middleware. Đây cũng là nơi cấu hình kết nối cơ sở dữ liệu và định nghĩa các tuyến đường chính.
+    models/userModel.js: Định nghĩa cấu trúc dữ liệu (schema) và mô hình (model) cho người dùng.
+    controllers/userController.js: Xử lý logic của ứng dụng. Ví dụ: đăng ký người dùng, đăng nhập người dùng.
+    routes/userRoutes.js: Định nghĩa các tuyến đường để người dùng tương tác với ứng dụng. Ví dụ: tuyến đường để đăng ký và đăng nhập.
+    config/db.js: Tệp cấu hình cho kết nối cơ sở dữ liệu.
+    views/: Thư mục chứa các tệp giao diện (template), thường được sử dụng cho email hoặc trang HTML được tạo từ server.
+==>Với cấu trúc này, bạn có thể dễ dàng mở rộng và quản lý ứng dụng của mình, vì các thành phần được tách biệt và có trách nhiệm riêng rẽ.
