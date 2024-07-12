@@ -16,7 +16,7 @@ app.use(cookieParser())
 app.use(bodyParser.json())
 app.use(
   cors({
-    origin:['http://localhost:3000','https://btn-authz.vercel.app'],
+    origin:['http://localhost:3000','https://btn-authz-sepia.vercel.app'],
     credentials:true
   })
 )
